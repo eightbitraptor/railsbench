@@ -2,6 +2,7 @@
 
 puts RUBY_DESCRIPTION
 
+require 'objspace'
 # Usage:
 #   WARMUP=0 BENCHMARK=10000 bin/bench
 #   PROFILE=wall INTERVAL=100 WARMUP=1 BENCHMARK=1000 bin/bench
@@ -11,6 +12,9 @@ ENV['RAILS_ENV'] ||= 'production'
 require_relative '../config/boot'
 require 'bundler/setup'
 require_relative '../config/environment'
+
+ruby_branch = RUBY_DESCRIPTION.match(/\(.*\)/)[0].split[1]
+output_prefix = "heap_#{ruby_branch}"
 
 class Bench
   PERCENTILES = [50, 66, 75, 80, 90, 95, 98, 99, 100].freeze
@@ -150,7 +154,7 @@ end
 bench = Bench.new(
   warmup: Integer(ENV.fetch('WARMUP', 0)),
   benchmark: Integer(ENV.fetch('BENCHMARK', 10000)),
-  path: ARGV.first || '/posts/1',
+  path: '/posts/1',
   results_file: ENV.fetch('RESULTS_FILE', nil)
 )
 if ENV.key?('PROFILE')
@@ -160,4 +164,8 @@ if ENV.key?('PROFILE')
   )
 else
   bench.measure
+  GC.start
+  ObjectSpace.dump_all(output: File.open("#{output_prefix}.uncompacted.heap", 'w'))
+  GC.compact
+  ObjectSpace.dump_all(output: File.open("#{output_prefix}.compacted.heap", 'w'))
 end
